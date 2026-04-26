@@ -862,12 +862,244 @@ export default function NewScan() {
                 ))}
               </div>
 
+              {/* ── Load Sample Code Buttons ── */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  marginBottom: '14px',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: '"Space Mono", monospace',
+                    fontSize: '10px',
+                    color: '#444',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                    marginRight: '4px',
+                  }}
+                >
+                  Load sample:
+                </span>
+
+                {/* JS Sample Button */}
+                <button
+                  id="load-js-sample"
+                  onClick={() => {
+                    setPasteLanguage('javascript')
+                    setCodeContent(`// =============================================
+// auth-controller.js — User Authentication
+// WARNING: This file contains known vulnerabilities
+// =============================================
+
+const crypto = require('crypto');
+
+// ❌ VULNERABILITY: MD5 is quantum-vulnerable & collision-prone
+function hashPassword(password) {
+  return crypto.createHash('md5').update(password).digest('hex');
+}
+
+// ❌ VULNERABILITY: SHA-1 is broken — collisions demonstrated by Google
+function generateToken(userId) {
+  const timestamp = Date.now().toString();
+  return crypto.createHash('sha1').update(userId + timestamp).digest('hex');
+}
+
+// ❌ VULNERABILITY: DES is a 56-bit cipher — trivially breakable
+function encryptSessionData(data, key) {
+  const cipher = crypto.createCipher('des', key);
+  let encrypted = cipher.update(data, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  return encrypted;
+}
+
+// ❌ VULNERABILITY: RSA-1024 is quantum-vulnerable (Shor's algorithm)
+const { generateKeyPairSync } = require('crypto');
+const { publicKey, privateKey } = generateKeyPairSync('rsa', {
+  modulusLength: 1024,
+});
+
+// ❌ VULNERABILITY: DOM-based XSS via innerHTML
+function renderUserGreeting() {
+  const params = new URLSearchParams(window.location.search);
+  const name = params.get('name');
+  document.getElementById('greeting').innerHTML = \`Welcome back, \${name}!\`;
+}
+
+// ❌ VULNERABILITY: eval() allows arbitrary code execution
+function processUserFormula(input) {
+  return eval(input);
+}
+
+// ❌ VULNERABILITY: Hardcoded secret in source code
+const API_SECRET = 'HARDCODED_SECRET_a1b2c3d4e5f6g7h8i9j0';
+
+module.exports = { hashPassword, generateToken, encryptSessionData };`)
+                  }}
+                  style={{
+                    background: '#fff',
+                    color: '#000',
+                    fontFamily: '"Space Mono", monospace',
+                    fontWeight: 700,
+                    fontSize: '10px',
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                    padding: '7px 14px',
+                    border: '2px solid #000',
+                    boxShadow: '3px 3px 0 #000',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.1s ease',
+                    whiteSpace: 'nowrap',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#00FF88'
+                    e.currentTarget.style.transform = 'translate(-2px, -2px)'
+                    e.currentTarget.style.boxShadow = '5px 5px 0 #000'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#fff'
+                    e.currentTarget.style.transform = 'translate(0, 0)'
+                    e.currentTarget.style.boxShadow = '3px 3px 0 #000'
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = 'translate(2px, 2px)'
+                    e.currentTarget.style.boxShadow = '1px 1px 0 #000'
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = 'translate(-2px, -2px)'
+                    e.currentTarget.style.boxShadow = '5px 5px 0 #000'
+                  }}
+                >
+                  <span style={{ fontSize: '13px' }}>⚡</span>
+                  JS Sample · XSS + Weak Crypto
+                </button>
+
+                {/* Python Sample Button */}
+                <button
+                  id="load-py-sample"
+                  onClick={() => {
+                    setPasteLanguage('python')
+                    setCodeContent(`# =============================================
+# crypto_utils.py — Cryptographic Utilities
+# WARNING: This file contains known vulnerabilities
+# =============================================
+
+import hashlib
+import hmac
+from Crypto.Cipher import DES
+from cryptography.hazmat.primitives.asymmetric import rsa, dsa
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.backends import default_backend
+
+# ❌ VULNERABILITY: MD5 is quantum-vulnerable & collision-prone
+def hash_password(password: str) -> str:
+    return hashlib.md5(password.encode()).hexdigest()
+
+# ❌ VULNERABILITY: SHA-1 is broken — collisions demonstrated
+def generate_token(user_id: str, secret: str) -> str:
+    return hashlib.sha1(f"{user_id}:{secret}".encode()).hexdigest()
+
+# ❌ VULNERABILITY: RSA-1024 is breakable by Shor's algorithm
+def generate_rsa_keypair():
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=1024,
+        backend=default_backend()
+    )
+    public_key = private_key.public_key()
+    return private_key, public_key
+
+# ❌ VULNERABILITY: DSA is quantum-vulnerable (discrete logarithm)
+def generate_dsa_keypair():
+    private_key = dsa.generate_private_key(
+        key_size=1024,
+        backend=default_backend()
+    )
+    return private_key
+
+# ❌ VULNERABILITY: DES is a 56-bit cipher — trivially breakable
+def encrypt_session(data: bytes, key: bytes) -> bytes:
+    cipher = DES.new(key[:8], DES.MODE_ECB)
+    padded = data + b'\\x00' * (8 - len(data) % 8)
+    return cipher.encrypt(padded)
+
+# ❌ VULNERABILITY: Hardcoded secret key
+SECRET_KEY = "super_secret_key_12345_do_not_share"
+
+# ❌ VULNERABILITY: HMAC with MD5 is quantum-vulnerable
+def sign_payload(payload: str) -> str:
+    return hmac.new(
+        SECRET_KEY.encode(),
+        payload.encode(),
+        hashlib.md5
+    ).hexdigest()
+
+# ❌ VULNERABILITY: Using SHA-1 for certificate fingerprinting
+def get_cert_fingerprint(cert_data: bytes) -> str:
+    return hashlib.sha1(cert_data).hexdigest()
+
+if __name__ == "__main__":
+    print("Password hash:", hash_password("admin123"))
+    print("Token:", generate_token("user_42", SECRET_KEY))
+    priv, pub = generate_rsa_keypair()
+    print("RSA-1024 key generated (INSECURE)")`)
+                  }}
+                  style={{
+                    background: '#fff',
+                    color: '#000',
+                    fontFamily: '"Space Mono", monospace',
+                    fontWeight: 700,
+                    fontSize: '10px',
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                    padding: '7px 14px',
+                    border: '2px solid #000',
+                    boxShadow: '3px 3px 0 #000',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.1s ease',
+                    whiteSpace: 'nowrap',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#00FF88'
+                    e.currentTarget.style.transform = 'translate(-2px, -2px)'
+                    e.currentTarget.style.boxShadow = '5px 5px 0 #000'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#fff'
+                    e.currentTarget.style.transform = 'translate(0, 0)'
+                    e.currentTarget.style.boxShadow = '3px 3px 0 #000'
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = 'translate(2px, 2px)'
+                    e.currentTarget.style.boxShadow = '1px 1px 0 #000'
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = 'translate(-2px, -2px)'
+                    e.currentTarget.style.boxShadow = '5px 5px 0 #000'
+                  }}
+                >
+                  <span style={{ fontSize: '13px' }}>⚡</span>
+                  PY Sample · Quantum Vulnerable
+                </button>
+              </div>
+
               {/* Textarea */}
               <div style={{ position: 'relative' }}>
                 <textarea
                   value={codeContent}
                   onChange={(e) => setCodeContent(e.target.value)}
-                  placeholder="// Paste your code here..."
+                  placeholder="// Paste your code here or load a sample above..."
                   style={{
                     width: '100%',
                     minHeight: '300px',
