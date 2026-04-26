@@ -9,6 +9,12 @@ const groq = require("../config/groq");
 const router = express.Router();
 
 const SCANNER_URL = process.env.SCANNER_ENGINE_URL || '';
+
+if (!SCANNER_URL) {
+  console.error('\n⚠️  SCANNER_ENGINE_URL is NOT set! All scans will return 0 vulnerabilities.');
+  console.error('   Set SCANNER_ENGINE_URL=https://your-scanner.onrender.com in your environment.\n');
+}
+
 const SEVERITY_ORDER = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1, NONE: 0 };
 
 // ──────────────────────────────────────────────
@@ -106,7 +112,7 @@ async function processScan(scanId, files, userId) {
       });
       scanResult = response.data;
     } catch (err) {
-      console.error(`Scanner error for ${file.path}:`, err.message);
+      console.error(`Scanner error for ${file.path} (URL: ${SCANNER_URL}):`, err.message);
       scanResult = {
         file_path: file.path,
         language: file.language,
