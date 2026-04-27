@@ -10,9 +10,51 @@ const router = express.Router();
 
 const SCANNER_URL = process.env.SCANNER_ENGINE_URL || '';
 
+console.log(`📡 SCANNER_ENGINE_URL = "${SCANNER_URL || '(NOT SET)'}"`)
+
 if (!SCANNER_URL) {
   console.error('\n⚠️  SCANNER_ENGINE_URL is NOT set! All scans will return 0 vulnerabilities.');
-  console.error('   Set SCANNER_ENGINE_URL=https://your-scanner.onrender.com in your environment.\n');
+  console.error('   Set SCANNER_ENGINE_URL=http://localhost:8000 in your environment.\n');
+}
+
+// Helper: delay for ms
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Helper: retry a request with exponential backoff (handles 429 rate limits & cold starts)
+async function axiosWithRetry(config, { maxRetries = 4, baseDelay = 2000, label = '' } = {}) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await axios(config);
+    } catch (err) {
+      const status = err.response?.status;
+      const isRetryable = status === 429 || status === 503 || !err.response; // rate-limit, unavailable, or network error
+
+      if (!isRetryable || attempt === maxRetries) {
+        throw err; // not retryable or out of retries
+      }
+
+      // Use Retry-After header if provided, otherwise exponential backoff
+      const retryAfter = err.response?.headers?.['retry-after'];
+      const delayMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : baseDelay * Math.pow(2, attempt);
+      console.log(`⏳ ${label || 'Request'} got ${status || 'network error'}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`);
+      await sleep(delayMs);
+    }
+  }
+}
+
+// Helper: check if scanner engine is reachable (with generous timeout for Render cold starts)
+async function checkScannerHealth() {
+  if (!SCANNER_URL) return { ok: false, reason: 'SCANNER_ENGINE_URL is not configured' };
+  try {
+    const resp = await axiosWithRetry(
+      { method: 'get', url: `${SCANNER_URL}/health`, timeout: 60000 },
+      { maxRetries: 3, baseDelay: 3000, label: 'Scanner health check' }
+    );
+    if (resp.data?.status === 'ok') return { ok: true };
+    return { ok: false, reason: `Scanner returned unexpected status: ${JSON.stringify(resp.data)}` };
+  } catch (err) {
+    return { ok: false, reason: `Cannot reach scanner at ${SCANNER_URL}: ${err.message}` };
+  }
 }
 
 const SEVERITY_ORDER = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1, NONE: 0 };
@@ -100,19 +142,47 @@ async function processScan(scanId, files, userId) {
   let maxSeverity = "NONE";
   const allVulnerabilities = [];
 
+  // Pre-flight: check if scanner engine is reachable
+  const health = await checkScannerHealth();
+  if (!health.ok) {
+    console.error(`❌ Scan ${scanId} aborted: ${health.reason}`);
+    if (supabase) {
+      await supabase
+        .from("scans")
+        .update({
+          status: "error",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", scanId);
+    }
+    return; // Abort — don't silently return "0 vulns"
+  }
+
+  let scannerFailures = 0;
+
   // Step 2: Scan each file via scanner-engine
   for (const file of files) {
     let scanResult;
 
     try {
-      const response = await axios.post(`${SCANNER_URL}/scan/file`, {
-        content: file.content,
-        file_path: file.path,
-        language: file.language || "javascript",
-      });
+      const response = await axiosWithRetry(
+        {
+          method: 'post',
+          url: `${SCANNER_URL}/scan/file`,
+          data: {
+            content: file.content,
+            file_path: file.path,
+            language: file.language || "javascript",
+          },
+          timeout: 30000,
+        },
+        { maxRetries: 4, baseDelay: 2000, label: `Scan ${file.path}` }
+      );
       scanResult = response.data;
+      console.log(`✓ Scanned ${file.path}: ${scanResult.vulnerability_count} vulnerabilities`);
     } catch (err) {
-      console.error(`Scanner error for ${file.path} (URL: ${SCANNER_URL}):`, err.message);
+      scannerFailures++;
+      console.error(`❌ Scanner error for ${file.path} (URL: ${SCANNER_URL}):`, err.response?.status || err.message);
       scanResult = {
         file_path: file.path,
         language: file.language,
@@ -194,11 +264,14 @@ async function processScan(scanId, files, userId) {
   }
 
   // Step 5: Update scan record to complete
+  // If ALL files failed to scan, mark as error instead of fake "complete"
+  const finalStatus = (scannerFailures === files.length) ? "error" : "complete";
+
   if (supabase) {
     await supabase
       .from("scans")
       .update({
-        status: "complete",
+        status: finalStatus,
         total_files_scanned: files.length,
         total_vulnerabilities: totalVulns,
         max_severity: maxSeverity,
@@ -207,8 +280,11 @@ async function processScan(scanId, files, userId) {
       .eq("id", scanId);
   }
 
+  if (scannerFailures > 0) {
+    console.warn(`⚠️  Scan ${scanId}: ${scannerFailures}/${files.length} files failed to scan`);
+  }
   console.log(
-    `✅ Scan ${scanId} complete: ${files.length} files, ${totalVulns} vulnerabilities, max severity: ${maxSeverity}`
+    `${finalStatus === 'complete' ? '✅' : '❌'} Scan ${scanId} ${finalStatus}: ${files.length} files, ${totalVulns} vulnerabilities, max severity: ${maxSeverity}`
   );
 }
 
